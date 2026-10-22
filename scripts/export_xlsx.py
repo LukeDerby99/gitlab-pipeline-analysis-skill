@@ -16,7 +16,12 @@ Formatting applied automatically, driven by which columns are present:
 Usage:
   ./export_xlsx.py --csv failed_specs_unique_<pid>.csv [-o OUT.xlsx] [--sheet NAME]
 
-Default output path is the CSV path with a .xlsx extension. Only the standard
+Default output path is the CSV path with a .xlsx extension, prefixed with a
+run number so the folder lists runs in the order they were analysed:
+`<n>-failed_specs_unique_<pid>.xlsx`. If the folder already holds a numbered
+sheet for the same pipeline, that number is reused (so both sheets of a run,
+and any re-analysis, share it); otherwise it is the highest number in the
+folder plus one. Pass --no-number (or -o) to opt out. Only the standard
 library is used, so this runs on any OS with a stock Python 3.
 """
 import argparse
@@ -235,6 +240,37 @@ def build_sheet(header, data, sheet_name, cause_jobs=None, spec_runs=None):
     return xlsx.Sheet(sheet_name, out_rows)
 
 
+# A sheet this script already numbered, e.g. `5-failed_specs_unique_2970984102.xlsx`.
+_NUMBERED_SHEET_RE = re.compile(r"^(\d+)-(?:failed_specs_unique|all_specs)_(\d+)\.xlsx$")
+# The pipeline id at the end of a CSV stem, e.g. `all_specs_2970984102`.
+_STEM_PIPELINE_RE = re.compile(r"_(\d+)$")
+
+
+def run_number(folder, pipeline_id):
+    """Run number for `pipeline_id`'s sheets in `folder`: the number its sheets
+    already carry there, else one more than the highest number in use (1 for a
+    folder with no numbered sheets). Unnumbered and unrelated files are ignored."""
+    numbers = {}
+    for p in Path(folder).iterdir():
+        m = _NUMBERED_SHEET_RE.match(p.name)
+        if m:
+            numbers.setdefault(m.group(2), set()).add(int(m.group(1)))
+    if pipeline_id in numbers:
+        return min(numbers[pipeline_id])
+    return max((n for ns in numbers.values() for n in ns), default=0) + 1
+
+
+def numbered_output_path(csv_path):
+    """`<dir>/<n>-<stem>.xlsx` for a CSV named `<stem>_<pid>.csv`; a CSV without
+    a trailing pipeline id is left unnumbered (`<dir>/<stem>.xlsx`)."""
+    csv_path = Path(csv_path)
+    m = _STEM_PIPELINE_RE.search(csv_path.stem)
+    if not m:
+        return csv_path.with_suffix(".xlsx")
+    n = run_number(csv_path.parent, m.group(1))
+    return csv_path.parent / f"{n}-{csv_path.stem}.xlsx"
+
+
 def main():
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -247,6 +283,12 @@ def main():
         action="store_true",
         help="delete the input CSV after the .xlsx is written successfully "
         "(so a run leaves only the Excel deliverable)",
+    )
+    ap.add_argument(
+        "--no-number",
+        action="store_true",
+        help="don't prefix the default output name with the run number "
+        "(ignored when -o is given, which is always used as-is)",
     )
     args = ap.parse_args()
 
@@ -280,7 +322,12 @@ def main():
     if sr:
         spec_runs = error_kind_enforce.load_spec_runs(sr)
 
-    out_path = args.output or str(Path(args.csv).with_suffix(".xlsx"))
+    if args.output:
+        out_path = args.output
+    elif args.no_number:
+        out_path = str(Path(args.csv).with_suffix(".xlsx"))
+    else:
+        out_path = str(numbered_output_path(args.csv))
     sheet_name = args.sheet or Path(args.csv).stem
     sheet = build_sheet(header, data, sheet_name, cause_jobs=cause_jobs, spec_runs=spec_runs)
     xlsx.write_workbook(out_path, [sheet])

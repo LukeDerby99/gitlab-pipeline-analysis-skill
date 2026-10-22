@@ -40,8 +40,13 @@ import xlsx  # noqa: E402  (stdlib-only .xlsx reader, ships with this skill)
 NEW_FAILURE_COLUMN = "New failure"
 NEW_FAILURE_POSITION = 2  # third column (0-indexed)
 # A previous run may have been exported to .xlsx (the deliverable) or left as
-# .csv (the intermediate) — detect and read either.
-UNIQUE_GLOBS = ("failed_specs_unique_*.csv", "failed_specs_unique_*.xlsx")
+# .csv (the intermediate) — detect and read either. export_xlsx.py prefixes the
+# .xlsx with a run number (`5-failed_specs_unique_<pid>.xlsx`).
+UNIQUE_GLOBS = (
+    "failed_specs_unique_*.csv",
+    "failed_specs_unique_*.xlsx",
+    "[0-9]*-failed_specs_unique_*.xlsx",
+)
 
 
 def _creation_time(path):

@@ -110,9 +110,22 @@ PIPELINE_ID="$(python3 "$HERE/find_nightly_pipeline.py" \
 
 log "Resolved pipeline #$PIPELINE_ID"
 
-if [ "$SKIP_IF_ALREADY_ANALYZED" = "yes" ] &&
-   [ -f "$OUT_DIR/failed_specs_unique_${PIPELINE_ID}.xlsx" ]; then
-  log "Already analyzed (failed_specs_unique_${PIPELINE_ID}.xlsx exists) — nothing to do."
+# The report for this pipeline, if one exists. export_xlsx.py prefixes it with
+# a run number (`5-failed_specs_unique_<pid>.xlsx`); older runs have no prefix.
+find_report() {
+  local f
+  for f in "$OUT_DIR/failed_specs_unique_${PIPELINE_ID}.xlsx" \
+           "$OUT_DIR"/[0-9]*-failed_specs_unique_"${PIPELINE_ID}".xlsx; do
+    if [ -f "$f" ]; then
+      printf '%s\n' "$f"
+      return 0
+    fi
+  done
+  return 1
+}
+
+if [ "$SKIP_IF_ALREADY_ANALYZED" = "yes" ] && EXISTING_REPORT="$(find_report)"; then
+  log "Already analyzed ($(basename "$EXISTING_REPORT") exists) — nothing to do."
   notify low "Pipeline #$PIPELINE_ID — already analyzed" \
     "Report already exists in $OUT_DIR; skipped."
   exit 0
@@ -194,15 +207,14 @@ if [ $CLAUDE_RC -ne 0 ]; then
   fail "claude exited with code $CLAUDE_RC — see $LOG_FILE"
 fi
 
-if [ ! -f "$OUT_DIR/failed_specs_unique_${PIPELINE_ID}.xlsx" ]; then
+if ! REPORT="$(find_report)"; then
   fail "run finished but failed_specs_unique_${PIPELINE_ID}.xlsx was not produced — see $LOG_FILE"
 fi
 
-SUMMARY="$(python3 "$HERE/summarize_report.py" \
-  "$OUT_DIR/failed_specs_unique_${PIPELINE_ID}.xlsx" 2>/dev/null || echo "report ready")"
+SUMMARY="$(python3 "$HERE/summarize_report.py" "$REPORT" 2>/dev/null || echo "report ready")"
 ELAPSED_MIN=$(( ( $(date +%s) - START_EPOCH + 30 ) / 60 ))
 
-log "Done. $SUMMARY. Report: $OUT_DIR/failed_specs_unique_${PIPELINE_ID}.xlsx"
+log "Done. $SUMMARY. Report: $REPORT"
 notify normal "Pipeline #$PIPELINE_ID — analysis finished" \
   "$SUMMARY
 Started $STARTED_AT, took ${ELAPSED_MIN} min

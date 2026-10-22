@@ -145,6 +145,18 @@ class FindPreviousTests(unittest.TestCase):
         self.assertIsNotNone(found)
         self.assertEqual(found.suffix, ".xlsx")
 
+    def test_detects_previous_numbered_xlsx(self):
+        # export_xlsx.py prefixes each run's sheets with a run number
+        prev = Path(self.tmp.name) / "4-failed_specs_unique_100.xlsx"
+        xlsx.write_workbook(
+            prev, [xlsx.Sheet("s", [[xlsx.Cell("Failed spec")], [xlsx.Cell("a.cy.js")]])]
+        )
+        self._touch_named("4-all_specs_100.xlsx")
+        cur = self._touch("failed_specs_unique_200.csv")
+        found = cnf.find_previous_unique_csv(cur)
+        self.assertIsNotNone(found)
+        self.assertEqual(found.name, prev.name)
+
     def _touch_named(self, name):
         p = Path(self.tmp.name) / name
         write_csv(p, ["Failed spec"], [["a.cy.js"]])

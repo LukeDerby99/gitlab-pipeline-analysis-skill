@@ -5,6 +5,26 @@ All notable changes to this skill are documented here. Format follows
 [Semantic Versioning](https://semver.org/) and is tracked in the `version`
 field of [`SKILL.md`](SKILL.md)'s frontmatter.
 
+## [2.3.0] - 2026-10-22
+
+### Added
+- **Run-numbered workbooks.** `export_xlsx.py` now prefixes each workbook with
+  a run number, `<n>-failed_specs_unique_<pid>.xlsx` and
+  `<n>-all_specs_<pid>.xlsx`, so a folder of reports lists runs in the order
+  they were analysed. Previously users renamed the files by hand (`1-`, `2-`,
+  ...) after every run. The number is the one this pipeline's sheets already
+  carry in the folder (so both sheets of a run share it, and re-analysing a
+  pipeline overwrites its own files), else the highest number there plus one.
+  Unnumbered sheets from older runs are ignored, so the first numbered run in
+  such a folder is `1`. `--no-number` keeps the old name; `-o` is still used
+  as-is.
+
+### Fixed
+- `compare_new_failures.py --detect-only` and `automation/nightly_report.sh`
+  now find numbered reports. Without this, the new-failure comparison would
+  never see a previous run, and the nightly job would report "not produced"
+  and re-analyse pipelines it had already done.
+
 ## [2.2.1] - 2026-10-09
 
 ### Fixed

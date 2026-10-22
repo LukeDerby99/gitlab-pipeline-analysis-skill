@@ -8,7 +8,7 @@ description: >-
   clickable job links, then group failures by root cause and offer to open a
   GitLab issue for the dominant cluster. Use when asked to investigate, analyze,
   triage, or summarize CI / pipeline test failures, or to classify why specs failed.
-version: 2.2.1
+version: 2.3.0
 ---
 
 # GitLab Pipeline Failure Analysis
@@ -37,8 +37,11 @@ for prior runs, so isolating each run in its own subfolder silently breaks
 regression detection.
 
 A run leaves exactly **two Excel files** in the working directory —
-`failed_specs_unique_<PID>.xlsx` (the failed specs, classified) and
-`all_specs_<PID>.xlsx` (every spec that ran, with its job links). The CSV and
+`<N>-failed_specs_unique_<PID>.xlsx` (the failed specs, classified) and
+`<N>-all_specs_<PID>.xlsx` (every spec that ran, with its job links). `N` is
+the run number, added by the exporter in step 7 (never add or change it by
+hand): `1` for the first run analysed in the folder, then one more each new
+pipeline, so the folder lists runs in the order they were analysed. The CSV and
 JSON files the scripts produce along the way are intermediates and are removed
 in step 7. Let `PID` be the pipeline id.
 
@@ -224,6 +227,13 @@ in step 7. Let `PID` be the pipeline id.
    python3 "$SKILL_DIR/scripts/export_xlsx.py" --csv "all_specs_$PID.csv" --remove-source
    rm -f "failures_raw_$PID.json" "mapping_$PID.json" "spec_runs_$PID.json"
    ```
+   The exporter names each workbook `<N>-<csv stem>.xlsx`. `N` is the number
+   this pipeline's sheets already carry in the folder (so both sheets of a run
+   share it, and re-analysing a pipeline overwrites its own files), else the
+   highest number in the folder plus one (`1` in a folder with no numbered
+   sheets; unnumbered sheets from older runs are ignored). Pass `--no-number`
+   only if the user asks for unnumbered files.
+
    The exporter (dependency-free — pure stdlib, runs on any OS) sorts rows
    alphabetically by spec and renders each job/cypress link as its **job
    number** (clickable). Cell colours:
@@ -237,9 +247,10 @@ in step 7. Let `PID` be the pipeline id.
      spec ran in.
 
    After this step the working directory holds exactly
-   `failed_specs_unique_$PID.xlsx` (the primary deliverable) and
-   `all_specs_$PID.xlsx`. The next run's step-3 comparison reads the unique
-   `.xlsx` as the previous run.
+   `<N>-failed_specs_unique_$PID.xlsx` (the primary deliverable) and
+   `<N>-all_specs_$PID.xlsx`. The next run's step-3 comparison reads the unique
+   `.xlsx` as the previous run. Report the actual filenames the exporter
+   printed (`Wrote ... to <file>`).
 
 8. **Summarize.** Give the user a breakdown grouped by `failure_cause` with
    counts and the spec lists, and call out: **newly-introduced failures
@@ -285,9 +296,10 @@ usually there (e.g. `selectProtocol` with `willRejectEntering: true` asserts
 ## Output recap
 
 A completed run leaves exactly **two files** in the working directory (both
-suffixed with the pipeline id so runs for different pipelines coexist):
+suffixed with the pipeline id so runs for different pipelines coexist, and
+prefixed with the run number `N` so they list in the order analysed):
 
-- **`failed_specs_unique_$PID.xlsx`** — the primary deliverable: failed specs,
+- **`<N>-failed_specs_unique_$PID.xlsx`** — the primary deliverable: failed specs,
   sorted by spec (specs show `<spec> (priority)` or `<spec> (setup)` when they
   ran in the priority or setup stage, followed by the parallel shard bracket
   `[run 3/8]` / `[priority 2/6]` / `[setup]`; offline-suite specs show
@@ -310,7 +322,7 @@ suffixed with the pipeline id so runs for different pipelines coexist):
   - For **flaky (passed-on-retry)** specs, `failure_cause` is enriched with the
     first-failure error (`flaky (passed on retry) — first failure: <error>`).
     Flaky specs stay LOW even if that first failure was a value/data mismatch.
-- **`all_specs_$PID.xlsx`** — every spec that ran (passed and failed), sorted,
+- **`<N>-all_specs_$PID.xlsx`** — every spec that ran (passed and failed), sorted,
   with `first_job_url, second_job_url` showing `job# (job name)`, green if the
   spec passed in that attempt / red if it failed. Lets you find which job a
   passed spec ran in.

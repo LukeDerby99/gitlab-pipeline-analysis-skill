@@ -11,7 +11,7 @@ repos can adopt it.
 
 ## What you get
 
-- **`failed_specs_unique_<pid>.xlsx`** — the primary deliverable: deduplicated,
+- **`<n>-failed_specs_unique_<pid>.xlsx`** — the primary deliverable: deduplicated,
   sorted by spec, with `New failure` (regression vs the previous run),
   `bug_likelihood_(AI)`, `failure_cause`, clickable job links, red cells for
   likely-real bugs and green rows for flaky (passed-on-retry) specs.
@@ -139,8 +139,11 @@ python3 "$SKILL/scripts/export_xlsx.py" --csv failed_specs_2635113652.csv --remo
 rm -f failures_raw_2635113652.json mapping_2635113652.json
 ```
 
-Each skill run leaves exactly two files — `failed_specs_unique_<pid>.xlsx`
-(primary) and `failed_specs_<pid>.xlsx` — flat in the working directory. Keep
+Each skill run leaves exactly two files — `<n>-failed_specs_unique_<pid>.xlsx`
+(primary) and `<n>-all_specs_<pid>.xlsx` — flat in the working directory. `<n>`
+is a run number the exporter adds (1, 2, 3, ... in the order pipelines were
+analysed in that folder; a re-analysed pipeline keeps its number; pass
+`--no-number` to opt out). Keep
 all runs in one folder (the pipeline-id suffix prevents collisions) so the
 `New failure` comparison can find prior runs; don't nest runs in per-pipeline
 subfolders.

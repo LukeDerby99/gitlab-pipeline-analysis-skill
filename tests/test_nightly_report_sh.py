@@ -34,11 +34,12 @@ cat "$STUB_GLAB_PAYLOAD"
 """
 
 # Simulates the skill: drops the two deliverables plus the intermediates that
-# the runner is responsible for cleaning up.
+# the runner is responsible for cleaning up. STUB_PREFIX mimics export_xlsx.py's
+# run-number prefix (e.g. `5-`).
 CLAUDE_STUB = """#!/usr/bin/env bash
 if [ "${STUB_CLAUDE_WRITES:-yes}" = "yes" ]; then
-  cp "$STUB_XLSX" "$STUB_OUT_DIR/failed_specs_unique_%(pid)s.xlsx"
-  cp "$STUB_XLSX" "$STUB_OUT_DIR/all_specs_%(pid)s.xlsx"
+  cp "$STUB_XLSX" "$STUB_OUT_DIR/${STUB_PREFIX:-}failed_specs_unique_%(pid)s.xlsx"
+  cp "$STUB_XLSX" "$STUB_OUT_DIR/${STUB_PREFIX:-}all_specs_%(pid)s.xlsx"
   : > "$STUB_OUT_DIR/failures_raw_%(pid)s.json"
   : > "$STUB_OUT_DIR/mapping_%(pid)s.json"
   : > "$STUB_OUT_DIR/spec_runs_%(pid)s.json"
@@ -168,6 +169,16 @@ class NightlyReportTests(unittest.TestCase):
         self.assertTrue((self.out / f"failed_specs_unique_{PID}.xlsx").exists())
         self.assertTrue((self.out / f"all_specs_{PID}.xlsx").exists())
 
+    def test_numbered_report_is_found_and_summarised(self):
+        """export_xlsx.py names the sheets `<n>-failed_specs_unique_<pid>.xlsx`."""
+        self.env["STUB_PREFIX"] = "5-"
+        r = self.run_script()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertTrue((self.out / f"5-failed_specs_unique_{PID}.xlsx").exists())
+        urgency, title, body = self.notifications()[-1]
+        self.assertIn("finished", title.lower())
+        self.assertIn("2 unique failures", body)
+
     def test_intermediates_are_cleaned_up(self):
         """The allowlist denies `rm` to Claude, so the wrapper must clean up."""
         self.run_script()
@@ -235,6 +246,13 @@ class NightlyReportTests(unittest.TestCase):
 
     def test_skips_when_already_analyzed(self):
         shutil.copy(self.fixture_xlsx, self.out / f"failed_specs_unique_{PID}.xlsx")
+        r = self.run_script()
+        self.assertEqual(r.returncode, 0)
+        self.assertFalse((self.out / "claude_args.txt").exists())
+        self.assertIn("already analyzed", self.notifications()[0][1].lower())
+
+    def test_skips_when_already_analyzed_as_numbered_report(self):
+        shutil.copy(self.fixture_xlsx, self.out / f"3-failed_specs_unique_{PID}.xlsx")
         r = self.run_script()
         self.assertEqual(r.returncode, 0)
         self.assertFalse((self.out / "claude_args.txt").exists())

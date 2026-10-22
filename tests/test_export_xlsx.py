@@ -340,8 +340,18 @@ class ExportXlsxTests(unittest.TestCase):
             capture_output=True, text=True,
         )
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertTrue(self.csv_path.with_suffix(".xlsx").exists())
+        # first run in an empty folder is numbered 1
+        self.assertTrue((self.csv_path.parent / "1-failed_specs_unique_1.xlsx").exists())
         self.assertTrue(self.csv_path.exists())  # source kept by default
+
+    def test_cli_no_number_keeps_bare_name(self):
+        self.write([mk("a.cy.js", first=JOB + "1")])
+        r = subprocess.run(
+            [sys.executable, str(SCRIPT), "--csv", str(self.csv_path), "--no-number"],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue(self.csv_path.with_suffix(".xlsx").exists())
 
     def test_remove_source_deletes_csv_after_export(self):
         self.write([mk("a.cy.js", first=JOB + "1")])
@@ -350,7 +360,7 @@ class ExportXlsxTests(unittest.TestCase):
             capture_output=True, text=True,
         )
         self.assertEqual(r.returncode, 0, r.stderr)
-        out = self.csv_path.with_suffix(".xlsx")
+        out = self.csv_path.parent / "1-failed_specs_unique_1.xlsx"
         self.assertTrue(out.exists())
         self.assertFalse(self.csv_path.exists())  # source removed
 
@@ -364,6 +374,73 @@ class ExportXlsxTests(unittest.TestCase):
         )
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertTrue(out.exists())
+
+
+class RunNumberTests(unittest.TestCase):
+    """Each analysed pipeline's sheets get a run-number prefix (`5-...`) taken
+    from the numbered sheets already in the output folder."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def touch(self, name):
+        (self.dir / name).write_bytes(b"")
+
+    def test_empty_folder_starts_at_one(self):
+        self.assertEqual(export_xlsx.run_number(self.dir, "500"), 1)
+
+    def test_next_number_after_highest(self):
+        for name in ("1-all_specs_100.xlsx", "1-failed_specs_unique_100.xlsx",
+                     "4-all_specs_400.xlsx", "4-failed_specs_unique_400.xlsx",
+                     "2-failed_specs_unique_200.xlsx"):
+            self.touch(name)
+        self.assertEqual(export_xlsx.run_number(self.dir, "500"), 5)
+
+    def test_same_pipeline_reuses_its_number(self):
+        # the second sheet of a run (and any re-analysis) keeps the run's number
+        self.touch("1-failed_specs_unique_100.xlsx")
+        self.touch("2-failed_specs_unique_200.xlsx")
+        self.assertEqual(export_xlsx.run_number(self.dir, "100"), 1)
+
+    def test_numbers_past_nine_sort_numerically(self):
+        self.touch("9-all_specs_900.xlsx")
+        self.touch("10-all_specs_1000.xlsx")
+        self.assertEqual(export_xlsx.run_number(self.dir, "1100"), 11)
+
+    def test_unnumbered_and_unrelated_files_are_ignored(self):
+        for name in ("failed_specs_unique_100.xlsx", "7-notes.xlsx",
+                     "3-failed_specs_unique_300.csv", "report-2.xlsx"):
+            self.touch(name)
+        self.assertEqual(export_xlsx.run_number(self.dir, "500"), 1)
+
+    def test_numbered_output_path(self):
+        self.touch("4-failed_specs_unique_400.xlsx")
+        out = export_xlsx.numbered_output_path(self.dir / "all_specs_500.csv")
+        self.assertEqual(out, self.dir / "5-all_specs_500.xlsx")
+
+    def test_numbered_output_path_without_pipeline_id_is_unnumbered(self):
+        out = export_xlsx.numbered_output_path(self.dir / "failed_specs_unique.csv")
+        self.assertEqual(out, self.dir / "failed_specs_unique.xlsx")
+
+    def test_both_sheets_of_a_run_share_the_number(self):
+        self.touch("4-all_specs_400.xlsx")
+        self.touch("4-failed_specs_unique_400.xlsx")
+        for stem in ("failed_specs_unique_500", "all_specs_500"):
+            csv_path = self.dir / f"{stem}.csv"
+            with open(csv_path, "w", newline="") as fh:
+                csv.writer(fh).writerows([HEADER, ["a.cy.js"] + [""] * (len(HEADER) - 1)])
+            r = subprocess.run(
+                [sys.executable, str(SCRIPT), "--csv", str(csv_path), "--remove-source"],
+                capture_output=True, text=True,
+            )
+            self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue((self.dir / "5-failed_specs_unique_500.xlsx").exists())
+        self.assertTrue((self.dir / "5-all_specs_500.xlsx").exists())
+        self.assertFalse((self.dir / "6-all_specs_500.xlsx").exists())
 
 
 if __name__ == "__main__":
