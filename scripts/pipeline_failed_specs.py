@@ -125,6 +125,8 @@ def spec_group_from_job_name(name):
 # commit recovers which specs a job that never started was meant to run.
 OFFLINE_SHARD_SCRIPT = "paratoo-webapp/scripts/cypress-parallel-offline.js"
 _PLANNED_CACHE = {}
+# The script reads CI_NODE_INDEX/SPEC_GROUP from the env (as in CI) and doesn't export sortOfflineSpecs.
+_EXPORT_SHARD_FN = "\nif (typeof sortOfflineSpecs === 'function') module.exports.sortOfflineSpecs = sortOfflineSpecs\n"
 _NODE_EVAL = (
     "const m = require(process.argv[1]);"
     "const out = m.sortOfflineSpecs(Number(process.argv[2]), process.argv[3] || '');"
@@ -159,10 +161,11 @@ def planned_offline_specs(project, sha, node, spec_group):
             src = fetch_repo_file(project, OFFLINE_SHARD_SCRIPT, sha)
             with tempfile.TemporaryDirectory() as tmp:
                 script = Path(tmp) / "cypress-parallel-offline.js"
-                script.write_text(src)
+                script.write_text(src + _EXPORT_SHARD_FN)
                 out = subprocess.run(
                     ["node", "-e", _NODE_EVAL, str(script), str(node), spec_group],
                     capture_output=True, text=True, timeout=30,
+                    env={**os.environ, "CI_NODE_INDEX": str(node), "SPEC_GROUP": spec_group},
                 )
             if out.returncode == 0:
                 result = [

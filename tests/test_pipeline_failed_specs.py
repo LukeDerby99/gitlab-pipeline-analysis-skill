@@ -378,5 +378,43 @@ class PlannedSpecsForJobTests(unittest.TestCase):
         self.assertEqual(calls, [])
 
 
+REAL_SHARD_SCRIPT = (Path(__file__).resolve().parent / "shard_script_dev_1_0_13.js").read_text()
+OFFLINE = "test/cypress/integration/offline"
+
+
+@unittest.skipUnless(shutil.which("node"), "node not installed")
+class PlannedOfflineSpecsRealScriptTests(unittest.TestCase):
+    """The real shard script reads CI_NODE_INDEX/SPEC_GROUP from the environment
+    and does not export sortOfflineSpecs."""
+
+    def setUp(self):
+        pfs._PLANNED_CACHE.clear()
+        self.addCleanup(pfs._PLANNED_CACHE.clear)
+
+    def planned(self, node, group):
+        with patch.object(pfs, "fetch_repo_file", lambda proj, path, ref: REAL_SHARD_SCRIPT):
+            return pfs.planned_offline_specs("proj", "sha1", node, group)
+
+    def test_real_script_node_1_group(self):
+        self.assertEqual(self.planned("1", "cover-fire"),
+                         [f"{OFFLINE}/offline-floristics-consumers-cover-fire.cy.js"])
+
+    def test_real_script_node_3_group(self):
+        self.assertEqual(self.planned("3", "qdaseq0009"),
+                         [f"{OFFLINE}/offline-acoustic.cy.js",
+                          f"{OFFLINE}/offline-partial-connection.cy.js",
+                          f"{OFFLINE}/offline-recruitment-survivorship.cy.js"])
+
+    def test_real_script_whole_node(self):
+        self.assertEqual(len(self.planned("1", "")), 7)
+        self.assertEqual(self.planned("4", ""),
+                         [f"{OFFLINE}/_summary-widgets.cy.js",
+                          f"{OFFLINE}/offline-floristics-and-dependencies-pro.cy.js"])
+
+    def test_real_script_unknown_group_degrades_to_empty(self):
+        with patch.object(sys, "stderr"):
+            self.assertEqual(self.planned("1", "no-such-group"), [])
+
+
 if __name__ == "__main__":
     unittest.main()
