@@ -210,5 +210,31 @@ class CypressJobAttemptsChildPipelineTests(unittest.TestCase):
         self.assertEqual([j["id"] for j in got["cypress-offline-child [node-1]"]], [710, 720])
 
 
+    def test_keeps_node_1_chain_jobs_by_stage(self):
+        def fake(path):
+            if "/pipelines/555/jobs" in path:
+                return json.dumps([])
+            if "/pipelines/555/bridges" in path:
+                return json.dumps([{"name": "cypress-offline-node-1", "downstream_pipeline": {"id": 66}}])
+            if "/pipelines/66/jobs" in path:
+                return json.dumps([
+                    {"id": 660, "name": "deploy-offline-stack", "stage": "deploy-offline-stack",
+                     "status": "success", "created_at": "2026-10-28T10:00:00Z"},
+                    {"id": 661, "name": "offline-floristics-setup", "stage": "test-cypress-offline",
+                     "status": "success", "created_at": "2026-10-28T10:01:00Z"},
+                    {"id": 662, "name": "offline-floristics-cover-fire", "stage": "test-cypress-offline",
+                     "status": "failed", "created_at": "2026-10-28T10:02:00Z"},
+                    {"id": 664, "name": "teardown-offline-stack", "stage": "teardown-offline-stack",
+                     "status": "success", "created_at": "2026-10-28T10:04:00Z"},
+                ])
+            raise AssertionError(path)
+
+        with patch.object(ef, "glab", fake):
+            got = ef.cypress_job_attempts("group/proj", "555")
+        self.assertEqual(set(got), {"offline-floristics-setup [node-1]",
+                                    "offline-floristics-cover-fire [node-1]"})
+        self.assertEqual(got["offline-floristics-cover-fire [node-1]"][0]["_offline_node"], "1")
+
+
 if __name__ == "__main__":
     unittest.main()

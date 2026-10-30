@@ -321,5 +321,22 @@ class PlannedOfflineSpecsTests(unittest.TestCase):
             self.assertEqual(pfs.planned_offline_specs("proj", "sha1", "1", ""), [])
 
 
+
+class IsCypressChildJobTests(unittest.TestCase):
+    """Offline node 1 runs as `offline-floristics-*` jobs; only their stage
+    (`test-cypress-offline`) says they are Cypress jobs."""
+
+    def test_node_1_chain_jobs_kept_by_stage(self):
+        for name in ("offline-floristics-setup", "offline-floristics-cover-fire", "offline-floristics-sync"):
+            self.assertTrue(pfs.is_cypress_child_job({"name": name, "stage": "test-cypress-offline"}), name)
+
+    def test_offline_stack_jobs_excluded(self):
+        self.assertFalse(pfs.is_cypress_child_job({"name": "deploy-offline-stack", "stage": "deploy-offline-stack"}))
+        self.assertFalse(pfs.is_cypress_child_job({"name": "teardown-offline-stack", "stage": "teardown-offline-stack"}))
+
+    def test_name_match_still_works_without_stage(self):
+        self.assertTrue(pfs.is_cypress_child_job({"name": "cypress-offline-child"}))
+
+
 if __name__ == "__main__":
     unittest.main()

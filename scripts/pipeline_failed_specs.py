@@ -205,6 +205,14 @@ def is_cypress_job(name):
     return "cypress" in name.lower()
 
 
+def is_cypress_child_job(job):
+    """`is_cypress_job` for a child-pipeline job, also matching its stage:
+    offline node 1 runs as `offline-floristics-*` jobs in stage
+    `test-cypress-offline`, while the offline stack's deploy/teardown jobs sit
+    in their own stages and stay out."""
+    return is_cypress_job(job["name"]) or is_cypress_job(job.get("stage") or "")
+
+
 def glab(path):
     """Call `glab api <path>` and return stdout as text."""
     try:
@@ -263,7 +271,8 @@ def fetch_bridges(project, pipeline_id):
     """Trigger (bridge) jobs of a pipeline, each pointing at a downstream child
     pipeline. Some Cypress suites run in child pipelines (e.g. the offline suite
     runs as `cypress-offline-node-N` bridges → child pipelines whose
-    `cypress-offline-child` job holds the specs), so those jobs are NOT in the
+    `cypress-offline-child*` / `offline-floristics-*` jobs hold the specs), so
+    those jobs are NOT in the
     parent pipeline's own job list. Includes retried bridges: re-running a
     bridge triggers a NEW child pipeline and hides the old bridge (and its
     failed child) from the default listing, so without include_retried a
@@ -297,7 +306,7 @@ def gather_cypress_jobs(project, pipeline_id):
         m = _OFFLINE_NODE_RE.search(bridge.get("name", ""))
         node = m.group(1) if m else ""
         for j in fetch_all_jobs(project, child_id):
-            if is_cypress_job(j["name"]):
+            if is_cypress_child_job(j):
                 j = dict(j)
                 j["_offline_node"] = node
                 jobs.append(j)
