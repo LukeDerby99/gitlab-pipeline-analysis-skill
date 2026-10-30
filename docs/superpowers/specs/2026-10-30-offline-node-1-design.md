@@ -1,7 +1,7 @@
 # Design: report offline node 1 (`offline-floristics-*`) failures
 
 Date: 2026-10-30. Tracks ternandsparrow/paratoo-fdcp#3096 (upstream half).
-Not committed: this file is for Luke's reference and stays out of the PR.
+Committed on the feature branch at Luke's request; whether it ships in the PR is his call.
 
 ## Intent
 
