@@ -267,6 +267,12 @@ class SpecGroupFromJobNameTests(unittest.TestCase):
         self.assertEqual(pfs.spec_group_from_job_name("cypress-offline-child-3: [camera-soils]"),
                          "camera-soils")
 
+    def test_node_1_chain_job_name(self):
+        self.assertEqual(pfs.spec_group_from_job_name("offline-floristics-cover-fire"), "cover-fire")
+        self.assertEqual(pfs.spec_group_from_job_name("offline-floristics-survivorship-online"),
+                         "survivorship-online")
+        self.assertEqual(pfs.spec_group_from_job_name("offline-floristics-setup"), "setup")
+
     def test_plain_job_name(self):
         self.assertEqual(pfs.spec_group_from_job_name("cypress-offline-child"), "")
         self.assertEqual(pfs.spec_group_from_job_name("cypress-run 3/8"), "")
@@ -336,6 +342,40 @@ class IsCypressChildJobTests(unittest.TestCase):
 
     def test_name_match_still_works_without_stage(self):
         self.assertTrue(pfs.is_cypress_child_job({"name": "cypress-offline-child"}))
+
+
+
+class PlannedSpecsForJobTests(unittest.TestCase):
+    """An empty group makes the shard script return the whole node, which is
+    only right for the one-job-per-node `cypress-offline-child`."""
+
+    def plan(self, job):
+        calls = []
+
+        def recorder(proj, sha, node, group):
+            calls.append((node, group))
+            return ["x.cy.js"]
+        with patch.object(pfs, "planned_offline_specs", recorder):
+            return pfs.planned_specs_for_job("proj", "sha1", job), calls
+
+    def test_chain_job_uses_its_group(self):
+        result, calls = self.plan({"name": "offline-floristics-cover-fire", "_offline_node": "1"})
+        self.assertEqual(calls, [("1", "cover-fire")])
+        self.assertEqual(result, ["x.cy.js"])
+
+    def test_plain_offline_child_uses_whole_node(self):
+        _, calls = self.plan({"name": "cypress-offline-child", "_offline_node": "1"})
+        self.assertEqual(calls, [("1", "")])
+
+    def test_ungrouped_chain_job_is_not_guessed(self):
+        result, calls = self.plan({"name": "offline-floristics", "_offline_node": "1"})
+        self.assertEqual(result, [])
+        self.assertEqual(calls, [])
+
+    def test_parent_job_has_no_plan(self):
+        result, calls = self.plan({"name": "cypress-run 1/8"})
+        self.assertEqual(result, [])
+        self.assertEqual(calls, [])
 
 
 if __name__ == "__main__":

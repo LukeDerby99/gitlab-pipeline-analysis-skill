@@ -103,13 +103,20 @@ def detect_job_abort(log):
 
 
 _SPEC_GROUP_RE = re.compile(r":\s*\[([^\]]+)\]\s*$")
+_NODE_1_JOB_PREFIX = "offline-floristics-"
 
 
 def spec_group_from_job_name(name):
-    """`cypress-offline-child-3: [drones]` -> 'drones' (GitLab parallel:matrix
-    suffix, which the CI passes to the shard script as SPEC_GROUP)."""
+    """The SPEC_GROUP a CI offline job passes to the shard script:
+    `cypress-offline-child-3: [drones]` -> 'drones' (parallel:matrix suffix),
+    `offline-floristics-cover-fire` -> 'cover-fire' (node 1's chain jobs set
+    SPEC_GROUP to their name minus the prefix), else ''."""
     m = _SPEC_GROUP_RE.search(name or "")
-    return m.group(1) if m else ""
+    if m:
+        return m.group(1)
+    if (name or "").startswith(_NODE_1_JOB_PREFIX):
+        return name[len(_NODE_1_JOB_PREFIX):]
+    return ""
 
 
 # The offline suite's shard table is code, not something the trace prints: the
@@ -173,6 +180,19 @@ def planned_offline_specs(project, sha, node, spec_group):
         sys.stderr.write(f"  could not resolve planned offline specs: {exc}\n")
     _PLANNED_CACHE[key] = result
     return result
+
+
+def planned_specs_for_job(project, sha, job):
+    """Planned specs for an offline child job, or [] for a parent job.
+    An empty group makes the shard script return its whole node, which is
+    only right for the one-job-per-node `cypress-offline-child`."""
+    node = job.get("_offline_node")
+    if not node:
+        return []
+    group = spec_group_from_job_name(job["name"])
+    if not group and job["name"] != "cypress-offline-child":
+        return []
+    return planned_offline_specs(project, sha, node, group)
 
 
 def no_specs_key(job):
@@ -488,13 +508,9 @@ def main():
         # contributes nothing and its failure vanishes from the report.
         if not order and job.get("status") == "failed":
             reason = detect_job_abort(trace)
-            planned = []
-            if job.get("_offline_node"):
-                if sha is None:
-                    sha = fetch_pipeline_sha(args.project, pipeline_id)
-                planned = planned_offline_specs(
-                    args.project, sha, job["_offline_node"], spec_group_from_job_name(job["name"])
-                )
+            if job.get("_offline_node") and sha is None:
+                sha = fetch_pipeline_sha(args.project, pipeline_id)
+            planned = planned_specs_for_job(args.project, sha, job)
             for full in planned:
                 base = os.path.basename(full)
                 known_spec_paths.setdefault(base, full)

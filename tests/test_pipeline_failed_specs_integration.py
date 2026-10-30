@@ -367,5 +367,44 @@ class Node1ChainTests(unittest.TestCase):
         self.assertEqual(sidecar["offline-floristics-setup.cy.js"]["runs"][0]["status"], "PASSED")
 
 
+
+NODE_1_ALL_SPECS = [f"test/cypress/integration/offline/offline-floristics-{s}.cy.js" for s in (
+    "setup", "consumers-recruitment", "consumers-survivorship-online", "consumers-survivorship-offline",
+    "consumers-condition-basal", "consumers-cover-fire", "sync")]
+NODE_1_ABORTED_JOBS = [
+    {"id": 672, "name": "offline-floristics-cover-fire", "stage": "test-cypress-offline", "status": "failed",
+     "created_at": "2026-10-28T10:02:00Z"},
+]
+NODE_1_PLANNED = {("1", "cover-fire"): [COVER_FIRE], ("1", ""): NODE_1_ALL_SPECS}
+
+
+class Node1AbortedJobTests(unittest.TestCase):
+    """An aborted node-1 job is reported against its own group's spec only."""
+
+    def test_aborted_consumer_reports_only_its_spec(self):
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        with patch.object(sys, "argv", ["pipeline_failed_specs.py", "445"]), \
+             patch.object(pfs, "fetch_all_jobs",
+                          lambda p, pid: [] if str(pid) == "445" else NODE_1_ABORTED_JOBS), \
+             patch.object(pfs, "fetch_bridges", lambda p, pid: NODE_1_BRIDGES), \
+             patch.object(pfs, "fetch_job_trace", lambda p, jid: ABORTED_TRACE), \
+             patch.object(pfs, "fetch_pipeline_sha", lambda p, pid: "sha1"), \
+             patch.object(pfs, "planned_offline_specs",
+                          lambda proj, sha, node, group: NODE_1_PLANNED[(node, group)]), \
+             patch.object(pfs, "CYPRESS_INTEGRATION_DIR", None):
+            cwd = os.getcwd()
+            os.chdir(tmp)
+            try:
+                with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                    pfs.main()
+            finally:
+                os.chdir(cwd)
+        with open(Path(tmp) / "failed_specs_unique_445.csv", newline="") as fh:
+            rows = {r["Failed spec"]: r for r in csv.DictReader(fh)}
+        self.assertEqual(list(rows), ["offline-floristics-consumers-cover-fire.cy.js"])
+        self.assertTrue(rows["offline-floristics-consumers-cover-fire.cy.js"]["Note"].startswith("NO SPECS RAN"))
+
+
 if __name__ == "__main__":
     unittest.main()

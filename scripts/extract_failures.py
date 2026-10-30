@@ -301,11 +301,7 @@ def aborted_job_records(trace, job, project, sha):
     when the offline shard table resolves (same keys as the sheet), otherwise a
     single `<job> (no specs ran)` record. error_kind `job-aborted`."""
     reason = pfs.detect_job_abort(trace)
-    planned = []
-    if job.get("_offline_node"):
-        planned = pfs.planned_offline_specs(
-            project, sha, job["_offline_node"], pfs.spec_group_from_job_name(job["name"])
-        )
+    planned = pfs.planned_specs_for_job(project, sha, job)
     keys = [(p.rsplit("/", 1)[-1], p) for p in planned] or [(pfs.no_specs_key(job), None)]
     data = OrderedDict()
     for spec, path in keys:

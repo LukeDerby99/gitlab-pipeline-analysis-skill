@@ -114,7 +114,14 @@ OFFLINE_ATTEMPTS = {
         {"id": 721, "name": "cypress-offline-child", "status": "failed",
          "created_at": "2026-09-24T15:00:00Z", "_offline_node": "2"},
     ],
+    "offline-floristics-cover-fire [node-1]": [
+        {"id": 741, "name": "offline-floristics-cover-fire", "status": "failed",
+         "created_at": "2026-10-28T10:02:00Z", "_offline_node": "1"},
+    ],
 }
+NODE_1_ALL_SPECS = [f"test/cypress/integration/offline/offline-floristics-{s}.cy.js" for s in (
+    "setup", "consumers-recruitment", "consumers-survivorship-online", "consumers-survivorship-offline",
+    "consumers-condition-basal", "consumers-cover-fire", "sync")]
 
 
 class NoSpecsRanExtractTests(unittest.TestCase):
@@ -126,7 +133,9 @@ class NoSpecsRanExtractTests(unittest.TestCase):
         out = Path(tmp) / "failures_raw_1.json"
         planned = {("3", "pair"): ["test/cypress/integration/offline/a.cy.js",
                                    "test/cypress/integration/offline/b.cy.js"],
-                   ("2", ""): []}
+                   ("2", ""): [],
+                   ("1", "cover-fire"): [NODE_1_ALL_SPECS[5]],
+                   ("1", ""): NODE_1_ALL_SPECS}
         with patch.object(sys, "argv", ["extract_failures.py", "555", "-o", str(out)]), \
              patch.object(ef, "cypress_job_attempts", lambda p, pid: OFFLINE_ATTEMPTS), \
              patch.object(ef, "glab", lambda path: ABORT_TRACE), \
@@ -147,6 +156,12 @@ class NoSpecsRanExtractTests(unittest.TestCase):
             self.assertEqual(rec["first_error"], "Cypress verification timed out.")
             self.assertEqual(rec["job_id"], 731)
             self.assertEqual(rec["spec_path"], f"test/cypress/integration/offline/{spec}")
+
+    def test_aborted_node_1_job_gets_only_its_spec(self):
+        specs = self.run_main()
+        node_1 = {s: r for s, r in specs.items() if r["job_id"] == 741}
+        self.assertEqual(list(node_1), ["offline-floristics-consumers-cover-fire.cy.js"])
+        self.assertEqual(node_1["offline-floristics-consumers-cover-fire.cy.js"]["error_kind"], "job-aborted")
 
     def test_unresolvable_job_uses_same_key_as_sheet(self):
         specs = self.run_main()
