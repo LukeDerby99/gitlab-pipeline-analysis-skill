@@ -295,11 +295,11 @@ def fetch_bridges(project, pipeline_id):
     pipeline. Some Cypress suites run in child pipelines (e.g. the offline suite
     runs as `cypress-offline-node-N` bridges → child pipelines whose
     `cypress-offline-child*` / `offline-floristics-*` jobs hold the specs), so
-    those jobs are NOT in the
-    parent pipeline's own job list. Includes retried bridges: re-running a
-    bridge triggers a NEW child pipeline and hides the old bridge (and its
-    failed child) from the default listing, so without include_retried a
-    failure that passed on a manual re-run vanishes from the report.
+    those jobs are NOT in the parent pipeline's own job list. Includes retried
+    bridges: re-running a bridge triggers a NEW child pipeline and hides the
+    old bridge (and its failed child) from the default listing, so without
+    include_retried a failure that passed on a manual re-run vanishes from the
+    report.
     Degrades to [] on older GitLab / no access."""
     project_enc = urllib.parse.quote(project, safe="")
     try:

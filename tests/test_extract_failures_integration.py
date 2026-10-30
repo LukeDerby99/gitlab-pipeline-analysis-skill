@@ -20,7 +20,7 @@ SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 sys.path.insert(0, str(SCRIPTS_DIR))
 
 import extract_failures as ef  # noqa: E402
-from fixtures import gitlab_line, build_log  # noqa: E402
+from fixtures import gitlab_line, build_log, NODE_1_ALL_SPECS  # noqa: E402
 
 # foo.cy.js (job 1/8): older attempt fails at 8.2 with a deep-equal data
 # mismatch (real bug); newer attempt fails earlier at 2.1 with a cy.click
@@ -119,9 +119,6 @@ OFFLINE_ATTEMPTS = {
          "created_at": "2026-10-28T10:02:00Z", "_offline_node": "1"},
     ],
 }
-NODE_1_ALL_SPECS = [f"test/cypress/integration/offline/offline-floristics-{s}.cy.js" for s in (
-    "setup", "consumers-recruitment", "consumers-survivorship-online", "consumers-survivorship-offline",
-    "consumers-condition-basal", "consumers-cover-fire", "sync")]
 
 
 class NoSpecsRanExtractTests(unittest.TestCase):
@@ -223,7 +220,6 @@ class CypressJobAttemptsChildPipelineTests(unittest.TestCase):
         with patch.object(ef, "glab", fake):
             got = ef.cypress_job_attempts("group/proj", "555")
         self.assertEqual([j["id"] for j in got["cypress-offline-child [node-1]"]], [710, 720])
-
 
     def test_keeps_node_1_chain_jobs_by_stage(self):
         def fake(path):

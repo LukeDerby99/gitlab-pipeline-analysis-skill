@@ -20,7 +20,7 @@ SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 sys.path.insert(0, str(SCRIPTS_DIR))
 
 import pipeline_failed_specs as pfs  # noqa: E402
-from fixtures import gitlab_line, build_log  # noqa: E402
+from fixtures import gitlab_line, build_log, NODE_1_ALL_SPECS  # noqa: E402
 
 RUN_A = "test/cypress/integration/run/a.cy.js"   # fails attempt 1, passes attempt 2 (flaky)
 RUN_B = "test/cypress/integration/run/b.cy.js"   # crashes attempt 1 (no [SPEC END])
@@ -292,7 +292,6 @@ class NoSpecsRanTests(unittest.TestCase):
         self.assertEqual(sidecar["offline-pro.cy.js"]["runs"][0]["status"], "PASSED")
 
 
-
 COVER_FIRE = "test/cypress/integration/offline/offline-floristics-consumers-cover-fire.cy.js"
 SETUP = "test/cypress/integration/offline/offline-floristics-setup.cy.js"
 NODE_1_BRIDGES = [{"name": "cypress-offline-node-1", "downstream_pipeline": {"id": 66}}]
@@ -367,10 +366,6 @@ class Node1ChainTests(unittest.TestCase):
         self.assertEqual(sidecar["offline-floristics-setup.cy.js"]["runs"][0]["status"], "PASSED")
 
 
-
-NODE_1_ALL_SPECS = [f"test/cypress/integration/offline/offline-floristics-{s}.cy.js" for s in (
-    "setup", "consumers-recruitment", "consumers-survivorship-online", "consumers-survivorship-offline",
-    "consumers-condition-basal", "consumers-cover-fire", "sync")]
 NODE_1_ABORTED_JOBS = [
     {"id": 672, "name": "offline-floristics-cover-fire", "stage": "test-cypress-offline", "status": "failed",
      "created_at": "2026-10-28T10:02:00Z"},

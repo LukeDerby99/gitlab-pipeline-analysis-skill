@@ -1,3 +1,4 @@
+import io
 import shutil
 import subprocess
 import sys
@@ -327,7 +328,6 @@ class PlannedOfflineSpecsTests(unittest.TestCase):
             self.assertEqual(pfs.planned_offline_specs("proj", "sha1", "1", ""), [])
 
 
-
 class IsCypressChildJobTests(unittest.TestCase):
     """Offline node 1 runs as `offline-floristics-*` jobs; only their stage
     (`test-cypress-offline`) says they are Cypress jobs."""
@@ -342,7 +342,6 @@ class IsCypressChildJobTests(unittest.TestCase):
 
     def test_name_match_still_works_without_stage(self):
         self.assertTrue(pfs.is_cypress_child_job({"name": "cypress-offline-child"}))
-
 
 
 class PlannedSpecsForJobTests(unittest.TestCase):
@@ -412,8 +411,9 @@ class PlannedOfflineSpecsRealScriptTests(unittest.TestCase):
                           f"{OFFLINE}/offline-floristics-and-dependencies-pro.cy.js"])
 
     def test_real_script_unknown_group_degrades_to_empty(self):
-        with patch.object(sys, "stderr"):
+        with patch.object(sys, "stderr", io.StringIO()) as err:
             self.assertEqual(self.planned("1", "no-such-group"), [])
+        self.assertIn('Unknown SPEC_GROUP "no-such-group"', err.getvalue())
 
 
 if __name__ == "__main__":

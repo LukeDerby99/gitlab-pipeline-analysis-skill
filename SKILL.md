@@ -91,8 +91,9 @@ in step 7. Let `PID` be the pipeline id.
    name: the `: [group]` matrix suffix, or the part after `offline-floristics-`.
    If that can't be resolved, or an offline job other than
    `cypress-offline-child` has no group, the job itself gets a row keyed
-   `<job name> node-N (no specs ran)`. The script prints a `ran NO specs` summary — always report these:
-   the spec didn't fail, it never got to run, so its coverage is missing.
+   `<job name> node-N (no specs ran)`. The script prints a `ran NO specs`
+   summary — always report these: the spec didn't fail, it never got to run,
+   so its coverage is missing.
 
 3. **Flag newly-introduced failures (optional, only if a previous run exists).**
    Ask the script for the most recent prior unique CSV in the working folder:
